@@ -330,6 +330,37 @@ async def get_ticket(code: str, request: Request):
     return ticket_view(doc, public_base(request), count)
 
 
+@api.get("/tickets/{code}/referrals")
+async def ticket_referrals(code: str):
+    """Friends who registered with this seat code. First name + college + created_at only —
+    never email, never surname — so the owner can see their referrals without exposing PII."""
+    doc = await find_ticket(code)
+    hidden = await demo_hidden()
+    match: dict[str, Any] = {"referred_by": doc["seat_code"], "deleted_at": None}
+    if hidden:
+        match["is_demo"] = False
+    rows = await db.registrations.find(match, {"_id": 0, "name": 1, "college": 1, "created_at": 1}).sort("created_at", 1).to_list(1000)
+    college_match: dict[str, Any] = {"college_key": doc["college_key"], "deleted_at": None}
+    if hidden:
+        college_match["is_demo"] = False
+    college_count = await db.registrations.count_documents(college_match)
+    return {
+        "seat_code": doc["seat_code"],
+        "count": len(rows),
+        "college": doc["college"],
+        "college_count": college_count,
+        "goal": WORKSHOP["campus_goal"],
+        "referrals": [
+            {
+                "first_name": (r["name"].split(" ")[0] if r.get("name") else ""),
+                "college": r["college"],
+                "created_at": r["created_at"].isoformat() if isinstance(r["created_at"], datetime) else r["created_at"],
+            }
+            for r in rows
+        ],
+    }
+
+
 @api.get("/tickets/{code}/og.png")
 async def ticket_og(code: str):
     doc = await find_ticket(code)
@@ -428,6 +459,37 @@ async def board():
         )
     total = sum(x["count"] for x in items)
     demo_total = sum(x["demo_count"] for x in items)
+
+    # Top referrers: seat codes ranked by friends registered with them. Real data always; demo rows
+    # are included and labelled only when the hide-demo toggle is off.
+    ref_match: dict[str, Any] = {"referred_by": {"$ne": None}, "deleted_at": None}
+    if hidden:
+        ref_match["is_demo"] = False
+    grouped = await db.registrations.aggregate(
+        [{"$match": ref_match}, {"$group": {"_id": "$referred_by", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}, {"$limit": 50}]
+    ).to_list(50)
+    codes = [g["_id"] for g in grouped]
+    refdocs = {
+        d["seat_code"]: d
+        for d in await db.registrations.find({"seat_code": {"$in": codes}, "deleted_at": None}, {"_id": 0, "seat_code": 1, "name": 1, "college": 1, "is_demo": 1}).to_list(1000)
+    }
+    top_referrers = []
+    for g in grouped:
+        d = refdocs.get(g["_id"])
+        if not d or (hidden and d.get("is_demo")):
+            continue
+        top_referrers.append(
+            {
+                "seat_code": g["_id"],
+                "first_name": (d["name"].split(" ")[0] if d.get("name") else ""),
+                "college": d["college"],
+                "count": g["count"],
+                "is_demo": d.get("is_demo", False),
+            }
+        )
+        if len(top_referrers) >= 10:
+            break
+
     return {
         "items": items,
         "goal": goal,
@@ -436,6 +498,7 @@ async def board():
         "total": total,
         "demo_total": demo_total,
         "has_demo": demo_total > 0,
+        "top_referrers": top_referrers,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 

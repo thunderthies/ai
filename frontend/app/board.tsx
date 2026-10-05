@@ -25,6 +25,7 @@ export default function BoardScreen() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [tick, setTick] = useState(0);
+  const [tab, setTab] = useState<"colleges" | "referrers">("colleges");
 
   const { data: config } = useQuery({ queryKey: ["config"], queryFn: api.config, staleTime: Infinity });
   const boardQ = useQuery({ queryKey: ["board"], queryFn: api.board, refetchInterval: REFRESH_MS, refetchIntervalInBackground: false });

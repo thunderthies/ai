@@ -14,6 +14,7 @@ import { Header } from "@/src/components/Header";
 import { ShareSheet } from "@/src/components/ShareSheet";
 import { useToast } from "@/src/components/Toast";
 import { MY_SEAT_KEY } from "@/src/referral";
+import { MilestoneBadges, MyReferrals, AddToCalendar } from "@/src/components/ReferralPanel";
 import { PageContainer, useBreakpoint } from "@/src/responsive";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
@@ -69,6 +70,8 @@ export default function TicketScreen() {
     />
   ) : null;
 
+  const badgesBlock = t && isMine ? <MilestoneBadges count={t.referral_count} /> : null;
+
   const shareBlock = t ? (
     isMine ? (
       <>
@@ -81,6 +84,8 @@ export default function TicketScreen() {
           </View>
         )}
         <ShareSheet ticket={t} workshop={workshop} onToast={(m, kind) => toast.show(m, kind)} />
+        <MyReferrals seatCode={t.seat_code} />
+        {workshop && <AddToCalendar workshop={workshop} link={t.share_url} onToast={(m) => toast.show(m)} />}
       </>
     ) : (
       <View style={styles.cta} testID="visitor-cta">
@@ -125,6 +130,7 @@ export default function TicketScreen() {
                 <View style={styles.colMain}>
                   {headerBlock}
                   {ticketBlock}
+                  {badgesBlock}
                 </View>
                 <View style={styles.colSide}>
                   {shareBlock}
@@ -135,6 +141,7 @@ export default function TicketScreen() {
               <>
                 {headerBlock}
                 {ticketBlock}
+                {badgesBlock}
                 {shareBlock}
                 {boardLinkBlock}
               </>

@@ -25,7 +25,9 @@ export type Ticket = {
 export type Workshop = {
   title: string;
   datetime_label: string;
+  start_iso: string;
   duration_label: string;
+  duration_minutes: number;
   mode: string;
   audience: string;
   campus_goal: number;
@@ -54,7 +56,21 @@ export type Board = {
   total: number;
   demo_total: number;
   has_demo: boolean;
+  top_referrers: TopReferrer[];
   updated_at: string;
+};
+
+export type TopReferrer = { seat_code: string; first_name: string; college: string; count: number; is_demo: boolean };
+
+export type ReferralItem = { first_name: string; college: string; created_at: string };
+
+export type Referrals = {
+  seat_code: string;
+  count: number;
+  college: string;
+  college_count: number;
+  goal: number;
+  referrals: ReferralItem[];
 };
 
 export type RegisterPayload = {
@@ -177,6 +193,7 @@ export const api = {
   colleges: () => request<{ colleges: string[] }>("/colleges"),
   projects: () => request<{ projects: Project[] }>("/projects"),
   ticket: (code: string) => request<Ticket>(`/tickets/${encodeURIComponent(code)}`),
+  referrals: (code: string) => request<Referrals>(`/tickets/${encodeURIComponent(code)}/referrals`),
   board: () => request<Board>("/board"),
   register: (payload: RegisterPayload) => request<Ticket>("/register", { method: "POST", body: JSON.stringify(payload) }),
   verifyPin: (pin: string) => request<{ ok: boolean; demo_hidden: boolean }>("/admin/verify", { method: "POST", body: JSON.stringify({ pin, hidden: false }) }),

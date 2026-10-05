@@ -17,6 +17,7 @@ import { HallTicket } from "@/src/components/HallTicket";
 import { Header } from "@/src/components/Header";
 import { useToast } from "@/src/components/Toast";
 import { Attribution, getAttribution, MY_SEAT_KEY } from "@/src/referral";
+import { countdownLabel } from "@/src/calendar";
 import { useBreakpoint } from "@/src/responsive";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 import { track } from "@/src/track";
@@ -153,6 +154,12 @@ export default function Home() {
                   {workshop?.datetime_label ?? "—"}
                 </Text>
               </View>
+              {workshop?.start_iso ? (
+                <View style={styles.countdownChip} testID="hero-countdown">
+                  <Ionicons name="time-outline" size={14} color={colors.onBrandSecondary} />
+                  <Text style={styles.countdownText}>{countdownLabel(workshop.start_iso).label}</Text>
+                </View>
+              ) : null}
             </Animated.View>
 
             {mySeat && (
@@ -273,6 +280,8 @@ const useStyles = makeStyles((colors) => ({
   lede: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 23, color: colors.onSurface },
   whenRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   when: { fontFamily: fonts.bold, fontSize: 15, color: colors.onSurface },
+  countdownChip: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", backgroundColor: colors.brandSecondary, borderWidth: 2, borderColor: colors.border, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.md },
+  countdownText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onBrandSecondary },
   banner: {
     borderWidth: 2,
     borderColor: colors.border,
