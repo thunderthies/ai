@@ -74,6 +74,7 @@ class Registration(BaseDocument):
     project: dict
     referred_by: Optional[str] = None
     source: dict
+    share_channel: Optional[str] = None
     is_demo: bool = False
     ip_hash: Optional[str] = None
     created_at: datetime
@@ -89,6 +90,28 @@ _WS_RE = re.compile(r"\s+")
 _SEAT_RE = re.compile(r"^NW-[A-Z0-9]{4}$")
 _CODE_RE = re.compile(r"^[A-Za-z0-9_\-]{1,40}$")
 SEAT_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+# Sharing platforms. The "via" query param on the share link and the "channel" field on share events
+# use these keys. Kept separate from source/utm bucketing (see analytics.source_bucket) on purpose.
+SHARE_CHANNELS = {
+    "whatsapp": "WhatsApp",
+    "telegram": "Telegram",
+    "linkedin": "LinkedIn",
+    "x": "X",
+    "facebook": "Facebook",
+    "instagram": "Instagram",
+    "email": "Email",
+    "native": "More / native share",
+    "copy": "Copy link",
+}
+
+
+def clean_channel(value: Optional[str]) -> Optional[str]:
+    """Map an incoming platform value to an allowed channel key, else None. Lenient (no error)."""
+    if not value:
+        return None
+    v = str(value).strip().lower()
+    return v if v in SHARE_CHANNELS else None
 
 
 def clean_text(value: str, max_len: int) -> str:
@@ -148,6 +171,7 @@ class RegisterIn(BaseModel):
     interest: str
     ref: Optional[str] = None
     rep: Optional[str] = None
+    via: Optional[str] = None
     utm_source: Optional[str] = None
     utm_medium: Optional[str] = None
     utm_campaign: Optional[str] = None
@@ -283,6 +307,7 @@ async def register(body: RegisterIn, request: Request):
         project=project,
         referred_by=referred_by,
         source=source,
+        share_channel=clean_channel(body.via),
         is_demo=False,
         ip_hash=hashlib.sha256(ip.encode()).hexdigest()[:16],
         created_at=datetime.now(timezone.utc),
@@ -327,8 +352,9 @@ async def ticket_story(code: str, request: Request):
 
 
 @api.get("/share/{code}", response_class=HTMLResponse)
-async def share_page(code: str, request: Request):
+async def share_page(code: str, request: Request, via: Optional[str] = None):
     base = public_base(request)
+    channel = clean_channel(via)
     try:
         doc = await find_ticket(code)
     except HTTPException:
@@ -338,7 +364,9 @@ async def share_page(code: str, request: Request):
     seat = html.escape(doc["seat_code"])
     title = f"{name} has a seat · {html.escape(WORKSHOP['title'])}"
     desc = f"{college} · Seat {seat} · {html.escape(WORKSHOP['datetime_label'])}. Free online workshop for 3rd & 4th year engineering students. Grab your own hall ticket."
-    target = f"{base}/ticket/{seat}"
+    # Humans land on the registration form carrying the referral (and the platform it came via),
+    # NOT on /ticket/, so a friend who opens the link can register right away.
+    target = f"{base}/?ref={seat}" + (f"&via={channel}" if channel else "")
     img = f"{base}/api/tickets/{seat}/og.png"
     page = f"""<!doctype html>
 <html lang="en"><head>
@@ -442,6 +470,7 @@ class EventIn(BaseModel):
     path: Optional[str] = Field(default=None, max_length=120)
     seat_code: Optional[str] = Field(default=None, max_length=12)
     tone: Optional[str] = Field(default=None, max_length=24)
+    channel: Optional[str] = Field(default=None, max_length=24)
 
 
 @api.post("/events", status_code=204)
@@ -461,6 +490,12 @@ async def track_event(body: EventIn, request: Request):
         if tone is not None and tone not in SHARE_TONES:
             raise HTTPException(status_code=422, detail="Unknown share tone")
         doc["tone"] = tone
+    # Optional sharing platform on share events. Unknown values are rejected (not silently dropped).
+    channel = (body.channel or "").strip().lower() or None
+    if channel is not None:
+        if channel not in SHARE_CHANNELS:
+            raise HTTPException(status_code=422, detail="Unknown share channel")
+        doc["channel"] = channel
     check_rate_limit(client_ip(request), bucket="events", limit=120, window=60, message="Too many events")
     await db.events.insert_one(doc)
     return Response(status_code=204)
@@ -505,6 +540,43 @@ async def shares_by_tone(include_demo: bool, demo_only: bool = False) -> dict:
     }
 
 
+async def shares_by_platform(regs_all: list[dict], include_demo: bool, demo_only: bool = False) -> dict:
+    """Per-platform shares clicked (from share_clicked events) and registrations that arrived with a
+    share_channel set. Real and demo kept apart. Counts only — a share click is not a sent message."""
+    # Registrations carrying a share_channel, split real vs demo.
+    real_regs: dict[str, int] = defaultdict(int)
+    demo_regs: dict[str, int] = defaultdict(int)
+    for r in regs_all:
+        ch = clean_channel(r.get("share_channel"))
+        if ch:
+            (demo_regs if r.get("is_demo") else real_regs)[ch] += 1
+    # share_clicked events tagged with a channel, split real vs demo.
+    rows = await db.events.aggregate(
+        [
+            {"$match": {"type": "share_clicked", "channel": {"$in": list(SHARE_CHANNELS)}}},
+            {"$group": {"_id": {"channel": "$channel", "is_demo": {"$eq": ["$is_demo", True]}}, "count": {"$sum": 1}}},
+        ]
+    ).to_list(200)
+    real_sh: dict[str, int] = defaultdict(int)
+    demo_sh: dict[str, int] = defaultdict(int)
+    for row in rows:
+        (demo_sh if row["_id"]["is_demo"] else real_sh)[row["_id"]["channel"]] += row["count"]
+
+    platforms = []
+    for ch, label in SHARE_CHANNELS.items():
+        platforms.append(
+            {
+                "channel": ch,
+                "label": label,
+                "real_shares": 0 if demo_only else real_sh.get(ch, 0),
+                "real_regs": 0 if demo_only else real_regs.get(ch, 0),
+                "demo_shares": demo_sh.get(ch, 0) if include_demo else 0,
+                "demo_regs": demo_regs.get(ch, 0) if include_demo else 0,
+            }
+        )
+    return {"platforms": platforms, "note": "Counts only. A share click does not mean the message was sent."}
+
+
 # ---------------------------------------------------------------------------
 # Campus reps
 # ---------------------------------------------------------------------------
@@ -512,7 +584,7 @@ async def load_regs(include_demo: bool = True) -> list[dict]:
     match: dict[str, Any] = {"deleted_at": None}
     if not include_demo:
         match["is_demo"] = False
-    return await db.registrations.find(match, {"_id": 0, "seat_code": 1, "referred_by": 1, "source": 1, "is_demo": 1, "created_at": 1, "college": 1, "college_key": 1, "name": 1, "email": 1, "branch": 1, "year": 1, "interest": 1, "project": 1}).to_list(100000)
+    return await db.registrations.find(match, {"_id": 0, "seat_code": 1, "referred_by": 1, "source": 1, "share_channel": 1, "is_demo": 1, "created_at": 1, "college": 1, "college_key": 1, "name": 1, "email": 1, "branch": 1, "year": 1, "interest": 1, "project": 1}).to_list(100000)
 
 
 def rep_link(base: str, code: str) -> str:
@@ -645,6 +717,7 @@ async def compute_stats(regs_all: list[dict], reps: list[dict], include_demo: bo
         "funnel": funnel,
         "funnel_window_days": 30,
         "shares_by_tone": await shares_by_tone(include_demo, demo_only=demo_only),
+        "by_platform": await shares_by_platform(regs_all, include_demo, demo_only=demo_only),
         "referrals": {**viral_coefficient(regs), "longest_chain": longest_chain(regs)},
         "demo_hidden": await demo_hidden(),
         "demo_only": demo_only,
@@ -657,10 +730,10 @@ async def admin_export(_: Annotated[dict, Depends(require_admin_header_or_query)
     regs = await load_regs(include_demo=include_demo)
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["seat_code", "name", "email", "college", "college_key", "branch", "year", "interest", "project", "source_bucket", "source_kind", "rep", "utm_source", "utm_medium", "utm_campaign", "referred_by", "is_demo", "created_at"])
+    w.writerow(["seat_code", "name", "email", "college", "college_key", "branch", "year", "interest", "project", "source_bucket", "source_kind", "rep", "utm_source", "utm_medium", "utm_campaign", "share_channel", "referred_by", "is_demo", "created_at"])
     for r in sorted(regs, key=lambda x: x["created_at"]):
         s = r.get("source") or {}
-        w.writerow([r["seat_code"], r["name"], r["email"], r["college"], r["college_key"], r["branch"], r["year"], r["interest"], (r.get("project") or {}).get("title", ""), source_bucket(r), s.get("kind"), s.get("rep"), s.get("utm_source"), s.get("utm_medium"), s.get("utm_campaign"), r.get("referred_by"), r.get("is_demo", False), r["created_at"].isoformat()])
+        w.writerow([r["seat_code"], r["name"], r["email"], r["college"], r["college_key"], r["branch"], r["year"], r["interest"], (r.get("project") or {}).get("title", ""), source_bucket(r), s.get("kind"), s.get("rep"), s.get("utm_source"), s.get("utm_medium"), s.get("utm_campaign"), r.get("share_channel"), r.get("referred_by"), r.get("is_demo", False), r["created_at"].isoformat()])
     return Response(content=buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="registrations.csv"'})
 
 
@@ -805,6 +878,46 @@ async def seed_demo_shares():
         logger.info("Seeded %d demo %s events (%d per tone)", len(docs), ev_type, per_tone)
 
 
+async def seed_demo_platforms():
+    """Seed per-platform demo data, spread evenly across SHARE_CHANNELS and labelled Demo data:
+    - share_clicked events tagged with a `channel` (no tone, so tone stats stay untouched)
+    - a share_channel on a slice of demo registrations
+    Idempotent: each half is skipped once its demo data already exists."""
+    channels = list(SHARE_CHANNELS)
+    now = datetime.now(timezone.utc)
+
+    if await db.events.count_documents({"is_demo": True, "type": "share_clicked", "channel": {"$in": channels}}) == 0:
+        seats = [d["seat_code"] for d in await db.registrations.find({"is_demo": True}, {"seat_code": 1}).to_list(1000)]
+        if seats:
+            rnd = random.Random(23)
+            docs = []
+            per_channel = 2  # even across platforms: demo must not suggest a winning platform
+            for ch in channels:
+                for i in range(per_channel):
+                    docs.append(
+                        {
+                            "type": "share_clicked",
+                            "session_id": f"demo-plat-{ch}-{i}",
+                            "path": "/ticket",
+                            "seat_code": rnd.choice(seats),
+                            "channel": ch,
+                            "is_demo": True,
+                            "created_at": now - timedelta(days=rnd.randint(0, 11), hours=rnd.randint(0, 23)),
+                        }
+                    )
+            await db.events.insert_many(docs)
+            logger.info("Seeded %d demo platform share events (%d per channel)", len(docs), per_channel)
+
+    if await db.registrations.count_documents({"is_demo": True, "share_channel": {"$ne": None}}) == 0:
+        demos = await db.registrations.find({"is_demo": True}, {"_id": 1}).sort("_id", 1).to_list(1000)
+        tagged = 0
+        for i, d in enumerate(demos[: len(channels) * 2]):  # 2 demo registrations per channel
+            await db.registrations.update_one({"_id": d["_id"]}, {"$set": {"share_channel": channels[i % len(channels)]}})
+            tagged += 1
+        if tagged:
+            logger.info("Tagged %d demo registrations with a share_channel", tagged)
+
+
 @app.on_event("startup")
 async def on_startup():
     await db.registrations.create_index("seat_code", unique=True)
@@ -816,6 +929,7 @@ async def on_startup():
     await seed_demo()
     await seed_reps()
     await seed_demo_shares()
+    await seed_demo_platforms()
 
 
 @app.on_event("shutdown")

@@ -113,6 +113,7 @@ export default function Home() {
       interest,
       ref: attribution?.ref ?? null,
       rep: attribution?.rep ?? null,
+      via: attribution?.via ?? null,
       utm_source: attribution?.utm_source ?? null,
       utm_medium: attribution?.utm_medium ?? null,
       utm_campaign: attribution?.utm_campaign ?? null,

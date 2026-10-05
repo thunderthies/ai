@@ -50,6 +50,33 @@ export function StatsPanels({ s, includeDemo, demoOnly = false }: Props) {
         ))}
         {s.top_reps.length === 0 && <Text style={styles.sub}>No reps yet.</Text>}
       </Section>
+
+      <Section title="Shares and registrations by platform" testID="admin-platforms">
+        <Text style={styles.note} testID="admin-platforms-note">
+          {s.by_platform.note}
+        </Text>
+        {!demoOnly &&
+          (() => {
+            const rows = s.by_platform.platforms.filter((p) => p.real_shares + p.real_regs > 0);
+            return rows.length ? (
+              rows.map((p) => <PlatformStat key={p.channel} channel={p.channel} label={p.label} shares={p.real_shares} regs={p.real_regs} />)
+            ) : (
+              <Text style={styles.sub}>No platform shares yet.</Text>
+            );
+          })()}
+        {includeDemo &&
+          (() => {
+            const rows = s.by_platform.platforms.filter((p) => p.demo_shares + p.demo_regs > 0);
+            return rows.length ? (
+              <View style={demoOnly ? undefined : styles.chain} testID="admin-platforms-demo">
+                <Text style={styles.kpiLabel}>Demo data</Text>
+                {rows.map((p) => (
+                  <PlatformStat key={p.channel} channel={`demo-${p.channel}`} label={p.label} shares={p.demo_shares} regs={p.demo_regs} />
+                ))}
+              </View>
+            ) : null;
+          })()}
+      </Section>
     </>
   );
 
@@ -172,6 +199,20 @@ function Stat({ label, value, hint, testID }: { label: string; value: string; hi
   );
 }
 
+function PlatformStat({ channel, label, shares, regs }: { channel: string; label: string; shares: number; regs: number }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.platRow} testID={`admin-platform-${channel}`}>
+      <Text style={styles.platLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={styles.platNums}>
+        <Text style={styles.platNum}>{shares}</Text> shares · <Text style={styles.platNum}>{regs}</Text> regs
+      </Text>
+    </View>
+  );
+}
+
 const GENERATIONS = 5;
 
 function Projection({ measuredK }: { measuredK: number }) {
@@ -251,6 +292,10 @@ const useStyles = makeStyles((colors) => ({
   statValue: { fontFamily: fonts.bold, fontSize: 28, color: colors.onSurfaceSecondary },
   chain: { gap: 4, borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: spacing.sm },
   chainPath: { fontFamily: fonts.mono, fontSize: 12, lineHeight: 18, color: colors.onSurfaceSecondary },
+  platRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  platLabel: { fontFamily: fonts.bold, fontSize: 14, color: colors.onSurface, flexShrink: 1 },
+  platNums: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted },
+  platNum: { fontFamily: fonts.monoBold, fontSize: 14, color: colors.onSurfaceSecondary },
   inputs: { flexDirection: "row", gap: spacing.sm },
   projResult: { backgroundColor: colors.brandSecondary, borderWidth: 2, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 2 },
   projValue: { fontFamily: fonts.bold, fontSize: 36, lineHeight: 40, color: colors.onBrandSecondary },

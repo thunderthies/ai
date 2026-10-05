@@ -172,7 +172,8 @@ class TestTickets:
         assert "Shareable User" in html
         assert "KL University" in html
         assert "og:image" in html and f"/api/tickets/{code}/og.png" in html
-        assert f"/ticket/{code}" in html
+        assert f"/?ref={code}" in html  # humans land on the registration form carrying the referral
+        assert f"/ticket/{code}" not in html  # no longer sent to the ticket page
         assert "refresh" in html.lower()
 
 

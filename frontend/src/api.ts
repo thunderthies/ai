@@ -66,6 +66,7 @@ export type RegisterPayload = {
   interest: string;
   ref?: string | null;
   rep?: string | null;
+  via?: string | null;
   utm_source?: string | null;
   utm_medium?: string | null;
   utm_campaign?: string | null;
@@ -90,6 +91,15 @@ export type RepDashboard = {
 
 export type ToneRow = { tone: string; label: string; shares: number; copies: number; total: number; pct: number };
 
+export type PlatformRow = {
+  channel: string;
+  label: string;
+  real_shares: number;
+  real_regs: number;
+  demo_shares: number;
+  demo_regs: number;
+};
+
 export type AdminStats = {
   totals: { real: number; demo: number; all: number };
   include_demo: boolean;
@@ -105,6 +115,10 @@ export type AdminStats = {
     real_untagged: number;
     demo: ToneRow[];
     demo_total: number;
+    note: string;
+  };
+  by_platform: {
+    platforms: PlatformRow[];
     note: string;
   };
   referrals: { total: number; referred: number; referrers: number; k: number; avg_per_referrer: number; longest_chain: { length: number; path: string[] } };
@@ -168,7 +182,7 @@ export const api = {
   verifyPin: (pin: string) => request<{ ok: boolean; demo_hidden: boolean }>("/admin/verify", { method: "POST", body: JSON.stringify({ pin, hidden: false }) }),
   setDemoHidden: (pin: string, hidden: boolean) =>
     request<{ demo_hidden: boolean }>("/admin/demo-visibility", { method: "POST", body: JSON.stringify({ pin, hidden }) }),
-  event: (body: { type: EventType; session_id: string; path?: string; seat_code?: string; tone?: string }) =>
+  event: (body: { type: EventType; session_id: string; path?: string; seat_code?: string; tone?: string; channel?: string }) =>
     request<void>("/events", { method: "POST", body: JSON.stringify(body) }),
   rep: (code: string) => request<RepDashboard>(`/reps/${encodeURIComponent(code)}`),
   adminLogin: async (password: string) => {

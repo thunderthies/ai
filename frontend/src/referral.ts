@@ -4,6 +4,7 @@ import { storage } from "@/src/utils/storage";
 export type Attribution = {
   ref: string | null;
   rep: string | null;
+  via: string | null;
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
@@ -12,7 +13,7 @@ export type Attribution = {
 const KEY = "hallticket.attribution";
 export const MY_SEAT_KEY = "hallticket.my_seat";
 
-const empty: Attribution = { ref: null, rep: null, utm_source: null, utm_medium: null, utm_campaign: null };
+const empty: Attribution = { ref: null, rep: null, via: null, utm_source: null, utm_medium: null, utm_campaign: null };
 
 function clean(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -25,6 +26,7 @@ export async function captureAttribution(params: Record<string, unknown>): Promi
   const incoming: Attribution = {
     ref: clean(params.ref),
     rep: clean(params.rep),
+    via: clean(params.via),
     utm_source: clean(params.utm_source),
     utm_medium: clean(params.utm_medium),
     utm_campaign: clean(params.utm_campaign),

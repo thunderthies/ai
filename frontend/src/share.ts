@@ -40,3 +40,38 @@ export function openWhatsApp(message: string) {
   }
   Linking.openURL(url);
 }
+
+// ---------------------------------------------------------------------------
+// Multi-platform sharing
+// ---------------------------------------------------------------------------
+export type Channel = "whatsapp" | "telegram" | "linkedin" | "x" | "facebook" | "instagram" | "email" | "native" | "copy";
+
+/** Build the share-intent URL for a platform. Returns null for platforms with no web intent
+ *  (instagram, native, copy) — those are handled specially in the UI. */
+export function platformShareUrl(channel: Channel, opts: { url: string; text: string; subject: string }): string | null {
+  const { url, text, subject } = opts;
+  switch (channel) {
+    case "whatsapp":
+      return `https://wa.me/?text=${encodeURIComponent(text)}`;
+    case "telegram":
+      return `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+    case "linkedin":
+      return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+    case "x":
+      return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+    case "facebook":
+      return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    case "email":
+      return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+    default:
+      return null;
+  }
+}
+
+export function openUrl(url: string) {
+  if (Platform.OS === "web") {
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+  Linking.openURL(url);
+}

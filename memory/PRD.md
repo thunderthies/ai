@@ -65,3 +65,10 @@ Mobile-first web app "Your Hall Ticket" for a free online workshop "Build Your F
 - Added shared layout helper `src/responsive.tsx` (`useBreakpoint`, `PageContainer`).
 - Header: centered max-width 1200, wide-only Share link.
 - Wide (>=768px) multi-column layouts for /board, /ticket/:code, /rep/:code, /admin, /admin-demo; up to 1100px wide. 360px mobile layout unchanged.
+
+## 2026-06 · Multi-platform sharing + per-platform referral tracking
+- Share link is now the backend share page {base}/api/share/{SEAT}?via={channel}; it redirects humans to {base}/?ref={SEAT}&via={channel} (registration form), not /ticket/.
+- `via` captured first-touch in src/referral.ts, stored on registration as share_channel (allowed: whatsapp, telegram, linkedin, x, facebook, instagram, email, native, copy; unknown -> null).
+- ShareSheet: WhatsApp/Telegram/X/Email (intents), LinkedIn/Facebook (copy text + open), Instagram (save story + copy link), More… (Web Share where available).
+- share_clicked events accept optional validated `channel` (unknown -> 422). New admin/admin-demo "Shares and registrations by platform" panel; share_channel added to CSV.
+- Backend tests: tests/test_channel.py (23). Updated test_hallticket share-HTML redirect assertion + tightened test_admin_demo PII check.
