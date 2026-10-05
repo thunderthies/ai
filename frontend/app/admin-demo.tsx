@@ -8,6 +8,7 @@ import { api } from "@/src/api";
 import { Footer } from "@/src/components/Footer";
 import { Header } from "@/src/components/Header";
 import { StatsPanels } from "@/src/components/StatsPanels";
+import { PageContainer } from "@/src/responsive";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 /** Public, read-only copy of the organiser dashboards fed by demo data only. No login, no export, no toggles. */
@@ -22,7 +23,7 @@ export default function AdminDemoScreen() {
     <View style={styles.screen} testID="admin-demo-screen">
       <Header />
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
-        <View style={styles.container}>
+        <PageContainer maxWidth={640} style={styles.containerGap}>
           <View style={styles.banner} testID="admin-demo-banner" accessibilityRole="alert">
             <Ionicons name="eye-outline" size={18} color={colors.onBrandSecondary} />
             <View style={{ flex: 1 }}>
@@ -48,7 +49,7 @@ export default function AdminDemoScreen() {
           )}
           {s && <StatsPanels s={s} includeDemo demoOnly />}
           <Footer />
-        </View>
+        </PageContainer>
       </ScrollView>
     </View>
   );
@@ -59,6 +60,7 @@ const useStyles = makeStyles((colors) => ({
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   container: { width: "100%", maxWidth: 640, alignSelf: "center", gap: spacing.lg },
+  containerGap: { gap: spacing.lg },
   center: { alignItems: "center", paddingVertical: spacing["3xl"] },
   banner: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, backgroundColor: colors.brandSecondary, borderWidth: 2, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
   bannerTitle: { fontFamily: fonts.bold, fontSize: 14, letterSpacing: 1, textTransform: "uppercase", color: colors.onBrandSecondary },

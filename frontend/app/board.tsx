@@ -1,7 +1,7 @@
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,6 +10,7 @@ import { Button } from "@/src/components/Button";
 import { Footer } from "@/src/components/Footer";
 import { Header } from "@/src/components/Header";
 import { useToast } from "@/src/components/Toast";
+import { PageContainer, useBreakpoint } from "@/src/responsive";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 const REFRESH_MS = 10_000;
@@ -18,6 +19,7 @@ export default function BoardScreen() {
   const styles = useStyles();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { isWide } = useBreakpoint();
   const toast = useToast();
   const qc = useQueryClient();
   const [adminOpen, setAdminOpen] = useState(false);
@@ -47,6 +49,56 @@ export default function BoardScreen() {
   const secondsAgo = board ? Math.max(0, Math.round((Date.now() - new Date(board.updated_at).getTime()) / 1000)) : 0;
   void tick;
 
+  const hasItems = !!board && board.items.length > 0;
+
+  const listNode = hasItems ? (
+    <View style={styles.list} testID="board-list">
+      {board!.items.map((item) => (
+        <BoardRow key={item.college_key} item={item} unlockLabel={board!.unlock_label} />
+      ))}
+    </View>
+  ) : null;
+
+  const footnoteNode = board ? (
+    <Text style={styles.footnote} testID="board-footnote">
+      Counts are distinct registrations per college (one per email).
+      {board.has_demo && !board.demo_hidden ? ` ${board.demo_total} of ${board.total} shown are seeded demo entries, labelled "Demo data".` : ""}
+    </Text>
+  ) : null;
+
+  const adminLinkNode = (
+    <Pressable testID="admin-open-button" accessibilityRole="button" accessibilityLabel="Admin: toggle demo data" onPress={() => setAdminOpen(true)} style={({ focused }: any) => [styles.adminLink, focused && styles.focused]}>
+      <Ionicons name="key-outline" size={14} color={colors.muted} />
+      <Text style={styles.adminLinkText}>Admin</Text>
+    </Pressable>
+  );
+
+  const summaryNode = board ? (
+    <View style={[styles.summary, isWide && styles.summarySticky]} testID="board-summary">
+      <Text style={styles.summaryKicker}>How the board works</Text>
+      <Text style={styles.summaryRule}>
+        First to {board.goal} seats unlocks{" "}
+        <Text style={styles.summaryRuleStrong}>{board.unlock_label}</Text>
+      </Text>
+      <View style={styles.summaryStat}>
+        <Text style={styles.summaryStatValue}>{board.total}</Text>
+        <Text style={styles.summaryStatLabel}>registrations across {board.items.length} colleges</Text>
+      </View>
+      {board.has_demo && !board.demo_hidden && (
+        <View style={styles.demoBadge} testID="board-summary-demo-label">
+          <Ionicons name="flask-outline" size={12} color={colors.onSurfaceTertiary} />
+          <Text style={styles.demoBadgeText}>Demo data visible</Text>
+        </View>
+      )}
+      {board.demo_hidden && (
+        <View style={styles.demoBadge} testID="board-summary-demo-hidden-label">
+          <Text style={styles.demoBadgeText}>Demo hidden</Text>
+        </View>
+      )}
+      {adminLinkNode}
+    </View>
+  ) : null;
+
   return (
     <View style={styles.screen} testID="board-screen">
       <Header />
@@ -55,7 +107,7 @@ export default function BoardScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
         refreshControl={<RefreshControl refreshing={boardQ.isFetching && !boardQ.isLoading} onRefresh={() => boardQ.refetch()} tintColor={colors.onSurface} />}
       >
-        <View style={styles.container}>
+        <PageContainer maxWidth={560}>
           <View style={styles.hero}>
             <Text style={styles.kicker}>Campus board</Text>
             <Text style={styles.h1} accessibilityRole="header">
@@ -99,57 +151,55 @@ export default function BoardScreen() {
             </View>
           )}
 
-          {board && board.items.length > 0 && (
-            <View style={styles.list} testID="board-list">
-              {board.items.map((item) => (
-                <BoardRow key={item.college_key} item={item} unlockLabel={board.unlock_label} />
-              ))}
+          {isWide && hasItems ? (
+            <View style={styles.cols}>
+              <View style={styles.colMain}>
+                {listNode}
+                {footnoteNode}
+              </View>
+              <View style={styles.colSide}>{summaryNode}</View>
             </View>
+          ) : (
+            <>
+              {listNode}
+              {footnoteNode}
+              {adminLinkNode}
+            </>
           )}
-
-          {board && (
-            <Text style={styles.footnote} testID="board-footnote">
-              Counts are distinct registrations per college (one per email).
-              {board.has_demo && !board.demo_hidden ? ` ${board.demo_total} of ${board.total} shown are seeded demo entries, labelled "Demo data".` : ""}
-            </Text>
-          )}
-
-          <Pressable testID="admin-open-button" accessibilityRole="button" accessibilityLabel="Admin: toggle demo data" onPress={() => setAdminOpen(true)} style={({ focused }: any) => [styles.adminLink, focused && styles.focused]}>
-            <Ionicons name="key-outline" size={14} color={colors.muted} />
-            <Text style={styles.adminLinkText}>Admin</Text>
-          </Pressable>
 
           <Footer text={config?.workshop.footer} />
-        </View>
+        </PageContainer>
       </ScrollView>
 
       <Modal visible={adminOpen} transparent animationType="fade" onRequestClose={() => setAdminOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setAdminOpen(false)} accessibilityLabel="Close admin dialog" />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]} testID="admin-sheet">
-          <Text style={styles.sheetTitle}>Admin · demo data</Text>
-          <Text style={styles.muted}>Enter the admin PIN to {board?.demo_hidden ? "show" : "hide"} the seeded demo registrations on the public board.</Text>
-          <TextInput
-            testID="admin-pin-input"
-            accessibilityLabel="Admin PIN"
-            value={pin}
-            onChangeText={setPin}
-            placeholder="PIN"
-            placeholderTextColor={colors.muted}
-            secureTextEntry
-            keyboardType="number-pad"
-            maxLength={12}
-            style={styles.pinInput}
-            autoFocus
-          />
-          <Button
-            testID="admin-toggle-button"
-            title={board?.demo_hidden ? "Show demo data" : "Hide demo data"}
-            onPress={() => toggleDemo.mutate({ hidden: !board?.demo_hidden })}
-            loading={toggleDemo.isPending}
-            disabled={pin.length < 4}
-            variant="ink"
-          />
-          <Button testID="admin-cancel-button" title="Cancel" onPress={() => setAdminOpen(false)} variant="ghost" />
+          <View style={styles.sheetInner}>
+            <Text style={styles.sheetTitle}>Admin · demo data</Text>
+            <Text style={styles.muted}>Enter the admin PIN to {board?.demo_hidden ? "show" : "hide"} the seeded demo registrations on the public board.</Text>
+            <TextInput
+              testID="admin-pin-input"
+              accessibilityLabel="Admin PIN"
+              value={pin}
+              onChangeText={setPin}
+              placeholder="PIN"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+              keyboardType="number-pad"
+              maxLength={12}
+              style={styles.pinInput}
+              autoFocus
+            />
+            <Button
+              testID="admin-toggle-button"
+              title={board?.demo_hidden ? "Show demo data" : "Hide demo data"}
+              onPress={() => toggleDemo.mutate({ hidden: !board?.demo_hidden })}
+              loading={toggleDemo.isPending}
+              disabled={pin.length < 4}
+              variant="ink"
+            />
+            <Button testID="admin-cancel-button" title="Cancel" onPress={() => setAdminOpen(false)} variant="ghost" />
+          </View>
         </View>
       </Modal>
     </View>
@@ -210,7 +260,9 @@ const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  container: { width: "100%", maxWidth: 560, alignSelf: "center", gap: spacing.xl },
+  cols: { flexDirection: "row", alignItems: "flex-start", gap: spacing["2xl"], width: "100%" },
+  colMain: { flex: 1.7, minWidth: 0, gap: spacing.xl },
+  colSide: { flex: 1, minWidth: 0, maxWidth: 360 },
   hero: { gap: spacing.sm },
   kicker: { fontFamily: fonts.bold, fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: colors.brandPrimary },
   h1: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 32, color: colors.onSurface, letterSpacing: -0.4 },
@@ -219,7 +271,7 @@ const useStyles = makeStyles((colors) => ({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.muted },
   dotActive: { backgroundColor: colors.brandPrimary },
   status: { fontFamily: fonts.mono, fontSize: 12, color: colors.muted },
-  demoBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.md },
+  demoBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.md, alignSelf: "flex-start" },
   demoBadgeText: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: colors.onSurfaceTertiary },
   center: { alignItems: "center", paddingVertical: spacing["2xl"] },
   muted: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.muted },
@@ -242,11 +294,20 @@ const useStyles = makeStyles((colors) => ({
   unlockNote: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 14, color: colors.muted },
   demoNote: { fontFamily: fonts.medium, fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: colors.muted },
   footnote: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.muted },
+  summary: { borderWidth: 2, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, backgroundColor: colors.surfaceSecondary, gap: spacing.md },
+  summarySticky: Platform.OS === "web" ? ({ position: "sticky", top: 88 } as any) : {},
+  summaryKicker: { fontFamily: fonts.bold, fontSize: 12, letterSpacing: 1.6, textTransform: "uppercase", color: colors.muted },
+  summaryRule: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.onSurfaceSecondary },
+  summaryRuleStrong: { fontFamily: fonts.bold, color: colors.onSurfaceSecondary },
+  summaryStat: { gap: 2, borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: spacing.md },
+  summaryStatValue: { fontFamily: fonts.bold, fontSize: 32, lineHeight: 36, color: colors.onSurfaceSecondary },
+  summaryStatLabel: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted },
   adminLink: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", minHeight: 44 },
   adminLinkText: { fontFamily: fonts.medium, fontSize: 12, color: colors.muted },
   focused: { outlineStyle: "solid", outlineWidth: 3, outlineColor: colors.focus, outlineOffset: 2 } as any,
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
-  sheet: { backgroundColor: colors.surface, borderTopWidth: 3, borderTopColor: colors.border, padding: spacing.lg, gap: spacing.md },
+  sheet: { backgroundColor: colors.surface, borderTopWidth: 3, borderTopColor: colors.border, padding: spacing.lg },
+  sheetInner: { width: "100%", maxWidth: 480, alignSelf: "center", gap: spacing.md },
   sheetTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.onSurface },
   pinInput: {
     minHeight: 48,

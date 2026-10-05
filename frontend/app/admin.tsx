@@ -12,6 +12,7 @@ import { Footer } from "@/src/components/Footer";
 import { Header } from "@/src/components/Header";
 import { StatsPanels } from "@/src/components/StatsPanels";
 import { useToast } from "@/src/components/Toast";
+import { PageContainer } from "@/src/responsive";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 export default function AdminScreen() {
@@ -106,7 +107,7 @@ function Dashboard({ includeDemo, setIncludeDemo, onLogout, onExpired }: { inclu
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
-      <View style={styles.container}>
+      <PageContainer maxWidth={640} style={styles.containerGap}>
         <View style={styles.hero}>
           <Text style={styles.kicker}>Organiser admin</Text>
           <Text style={styles.h1}>Registrations</Text>
@@ -139,7 +140,7 @@ function Dashboard({ includeDemo, setIncludeDemo, onLogout, onExpired }: { inclu
 
         {s && <StatsPanels s={s} includeDemo={includeDemo} />}
         <Footer />
-      </View>
+      </PageContainer>
     </ScrollView>
   );
 }
@@ -149,6 +150,7 @@ const useStyles = makeStyles((colors) => ({
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   container: { width: "100%", maxWidth: 640, alignSelf: "center", gap: spacing.lg },
+  containerGap: { gap: spacing.lg },
   center: { alignItems: "center", paddingVertical: spacing["3xl"] },
   loginBox: { gap: spacing.md, paddingTop: spacing["2xl"], maxWidth: 420 },
   hero: { gap: spacing.sm },

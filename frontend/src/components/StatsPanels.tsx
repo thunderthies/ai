@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import type { AdminStats } from "@/src/api";
 import { DailyBars, HBar } from "@/src/components/Charts";
 import { Field } from "@/src/components/Field";
+import { useBreakpoint } from "@/src/responsive";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 type Props = {
@@ -18,33 +19,12 @@ type Props = {
 export function StatsPanels({ s, includeDemo, demoOnly = false }: Props) {
   const styles = useStyles();
   const { colors } = useTheme();
+  const { isWide } = useBreakpoint();
   const router = useRouter();
   const tones = s.shares_by_tone;
 
-  return (
+  const leftPanels = (
     <>
-      <View style={styles.kpis}>
-        {!demoOnly && (
-          <View style={[styles.kpi, styles.kpiPrimary]} testID="admin-total-real">
-            <Text style={[styles.kpiLabel, { color: colors.onBrandSecondary }]}>Real</Text>
-            <Text style={[styles.kpiValue, { color: colors.onBrandSecondary }]}>{s.totals.real}</Text>
-          </View>
-        )}
-        <View style={styles.kpi} testID="admin-total-demo">
-          <Text style={styles.kpiLabel}>Demo data</Text>
-          <Text style={styles.kpiValue}>{s.totals.demo}</Text>
-        </View>
-        <View style={styles.kpi} testID="admin-total-all">
-          <Text style={styles.kpiLabel}>{demoOnly ? "All (demo)" : "All"}</Text>
-          <Text style={styles.kpiValue}>{s.totals.all}</Text>
-        </View>
-      </View>
-      {!demoOnly && s.totals.demo > 0 && (
-        <Text style={styles.note}>
-          Demo rows are seeded (is_demo = true) and {s.demo_hidden ? "currently hidden" : "visible"} on the public board. Charts below {includeDemo ? "include demo data" : "show real registrations only"}.
-        </Text>
-      )}
-
       <Section title="By source" testID="admin-sources">
         {s.sources.map((r) => (
           <HBar key={r.source} label={r.source} value={r.count} max={Math.max(1, ...s.sources.map((x) => x.count))} highlight={r.source === "rep"} />
@@ -70,7 +50,11 @@ export function StatsPanels({ s, includeDemo, demoOnly = false }: Props) {
         ))}
         {s.top_reps.length === 0 && <Text style={styles.sub}>No reps yet.</Text>}
       </Section>
+    </>
+  );
 
+  const rightPanels = (
+    <>
       <Section title={`Funnel · last ${s.funnel_window_days} days (${demoOnly ? "demo events" : "real traffic"})`} testID="admin-funnel">
         {s.funnel.map((f, i) => {
           const prev = i > 0 ? s.funnel[i - 1].count : 0;
@@ -125,6 +109,44 @@ export function StatsPanels({ s, includeDemo, demoOnly = false }: Props) {
       </Section>
 
       <Projection measuredK={s.referrals.k} />
+    </>
+  );
+
+  return (
+    <>
+      <View style={styles.kpis}>
+        {!demoOnly && (
+          <View style={[styles.kpi, styles.kpiPrimary]} testID="admin-total-real">
+            <Text style={[styles.kpiLabel, { color: colors.onBrandSecondary }]}>Real</Text>
+            <Text style={[styles.kpiValue, { color: colors.onBrandSecondary }]}>{s.totals.real}</Text>
+          </View>
+        )}
+        <View style={styles.kpi} testID="admin-total-demo">
+          <Text style={styles.kpiLabel}>Demo data</Text>
+          <Text style={styles.kpiValue}>{s.totals.demo}</Text>
+        </View>
+        <View style={styles.kpi} testID="admin-total-all">
+          <Text style={styles.kpiLabel}>{demoOnly ? "All (demo)" : "All"}</Text>
+          <Text style={styles.kpiValue}>{s.totals.all}</Text>
+        </View>
+      </View>
+      {!demoOnly && s.totals.demo > 0 && (
+        <Text style={styles.note}>
+          Demo rows are seeded (is_demo = true) and {s.demo_hidden ? "currently hidden" : "visible"} on the public board. Charts below {includeDemo ? "include demo data" : "show real registrations only"}.
+        </Text>
+      )}
+
+      {isWide ? (
+        <View style={styles.panelCols}>
+          <View style={styles.panelCol}>{leftPanels}</View>
+          <View style={styles.panelCol}>{rightPanels}</View>
+        </View>
+      ) : (
+        <>
+          {leftPanels}
+          {rightPanels}
+        </>
+      )}
     </>
   );
 }
@@ -215,8 +237,10 @@ const useStyles = makeStyles((colors) => ({
   sub: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.muted },
   note: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.muted },
   focused: { outlineStyle: "solid", outlineWidth: 3, outlineColor: colors.focus, outlineOffset: 2 } as any,
-  kpis: { flexDirection: "row", gap: spacing.sm },
-  kpi: { flex: 1, borderWidth: 2, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, backgroundColor: colors.surfaceSecondary, gap: 2 },
+  panelCols: { flexDirection: "row", alignItems: "flex-start", gap: spacing.lg, width: "100%" },
+  panelCol: { flex: 1, minWidth: 0, gap: spacing.lg },
+  kpis: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  kpi: { flexGrow: 1, flexBasis: 120, minWidth: 120, borderWidth: 2, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, backgroundColor: colors.surfaceSecondary, gap: 2 },
   kpiPrimary: { backgroundColor: colors.brandSecondary },
   kpiLabel: { fontFamily: fonts.medium, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: colors.muted },
   kpiValue: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 32, color: colors.onSurfaceSecondary },

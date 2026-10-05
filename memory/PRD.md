@@ -60,3 +60,8 @@ Mobile-first web app "Your Hall Ticket" for a free online workshop "Build Your F
 - P1: Campus-rep dashboard (per `rep` code counts) and per-source analytics.
 - P2: Template-pack delivery flow when a college unlocks (currently a prototype note on the board); CSV export for organiser.
 - P2: `<a href>` for WhatsApp CTA on web (currently Linking/window.open).
+
+## 2026-06 · Responsive desktop layouts
+- Added shared layout helper `src/responsive.tsx` (`useBreakpoint`, `PageContainer`).
+- Header: centered max-width 1200, wide-only Share link.
+- Wide (>=768px) multi-column layouts for /board, /ticket/:code, /rep/:code, /admin, /admin-demo; up to 1100px wide. 360px mobile layout unchanged.

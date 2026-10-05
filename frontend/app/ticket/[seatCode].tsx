@@ -14,6 +14,7 @@ import { Header } from "@/src/components/Header";
 import { ShareSheet } from "@/src/components/ShareSheet";
 import { useToast } from "@/src/components/Toast";
 import { MY_SEAT_KEY } from "@/src/referral";
+import { PageContainer, useBreakpoint } from "@/src/responsive";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
 
@@ -21,6 +22,7 @@ export default function TicketScreen() {
   const styles = useStyles();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { isWide } = useBreakpoint();
   const router = useRouter();
   const toast = useToast();
   const reduce = useReducedMotion();
@@ -44,11 +46,63 @@ export default function TicketScreen() {
   const workshop = config?.workshop;
   const t = ticketQ.data;
 
+  const headerBlock = t ? (
+    <Animated.View entering={reduce ? undefined : FadeInDown.duration(300)} style={styles.topRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.kicker}>{isMine ? (fresh ? "Seat confirmed" : "Your hall ticket") : `${t.name.split(" ")[0]}'s hall ticket`}</Text>
+        <Text style={styles.h2}>{isMine ? (fresh ? "You're in. Keep this safe." : "See you in the hall.") : "Grab the seat next to them."}</Text>
+      </View>
+      {t.is_demo && (
+        <View style={styles.demoTag} testID="ticket-demo-label">
+          <Text style={styles.demoTagText}>Demo data</Text>
+        </View>
+      )}
+    </Animated.View>
+  ) : null;
+
+  const ticketBlock = t ? (
+    <HallTicket
+      draft={{ name: t.name, college: t.college, branch: t.branch, year: t.year, seatCode: t.seat_code, project: t.project }}
+      workshop={workshop}
+      registered
+      animateStamp={!!fresh}
+    />
+  ) : null;
+
+  const shareBlock = t ? (
+    isMine ? (
+      <>
+        {t.referral_count > 0 && (
+          <View style={styles.refCount} testID="referral-count">
+            <Ionicons name="people" size={16} color={colors.onBrandSecondary} />
+            <Text style={styles.refCountText}>
+              {t.referral_count} {t.referral_count === 1 ? "friend has" : "friends have"} registered with your link
+            </Text>
+          </View>
+        )}
+        <ShareSheet ticket={t} workshop={workshop} onToast={(m, kind) => toast.show(m, kind)} />
+      </>
+    ) : (
+      <View style={styles.cta} testID="visitor-cta">
+        <Text style={styles.ctaTitle}>Want your own seat?</Text>
+        <Text style={[styles.muted, { textAlign: "left" }]}>Free, 60 minutes, online. You'll get a project matched to your branch and interest.</Text>
+        <Button testID="visitor-register-button" title="Get my hall ticket" onPress={() => router.push({ pathname: "/", params: { ref: t.seat_code } })} />
+      </View>
+    )
+  ) : null;
+
+  const boardLinkBlock = t ? (
+    <Pressable testID="ticket-board-link" accessibilityRole="link" onPress={() => router.push("/board")} style={({ focused }: any) => [styles.boardLink, focused && styles.focused]}>
+      <Ionicons name="podium-outline" size={18} color={colors.onSurface} />
+      <Text style={styles.boardLinkText}>See how {t.college} is doing on the campus board →</Text>
+    </Pressable>
+  ) : null;
+
   return (
     <View style={styles.screen} testID="ticket-screen">
       <Header />
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
-        <View style={styles.container}>
+        <PageContainer maxWidth={560}>
           {ticketQ.isLoading && (
             <View style={styles.center} testID="ticket-loading">
               <ActivityIndicator color={colors.onSurface} />
@@ -65,56 +119,29 @@ export default function TicketScreen() {
             </View>
           )}
 
-          {t && (
-            <>
-              <Animated.View entering={reduce ? undefined : FadeInDown.duration(300)} style={styles.topRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.kicker}>{isMine ? (fresh ? "Seat confirmed" : "Your hall ticket") : `${t.name.split(" ")[0]}'s hall ticket`}</Text>
-                  <Text style={styles.h2}>{isMine ? (fresh ? "You're in. Keep this safe." : "See you in the hall.") : "Grab the seat next to them."}</Text>
+          {t &&
+            (isWide ? (
+              <View style={styles.cols}>
+                <View style={styles.colMain}>
+                  {headerBlock}
+                  {ticketBlock}
                 </View>
-                {t.is_demo && (
-                  <View style={styles.demoTag} testID="ticket-demo-label">
-                    <Text style={styles.demoTagText}>Demo data</Text>
-                  </View>
-                )}
-              </Animated.View>
-
-              <HallTicket
-                draft={{ name: t.name, college: t.college, branch: t.branch, year: t.year, seatCode: t.seat_code, project: t.project }}
-                workshop={workshop}
-                registered
-                animateStamp={!!fresh}
-              />
-
-              {isMine ? (
-                <>
-                  {t.referral_count > 0 && (
-                    <View style={styles.refCount} testID="referral-count">
-                      <Ionicons name="people" size={16} color={colors.onBrandSecondary} />
-                      <Text style={styles.refCountText}>
-                        {t.referral_count} {t.referral_count === 1 ? "friend has" : "friends have"} registered with your link
-                      </Text>
-                    </View>
-                  )}
-                  <ShareSheet ticket={t} workshop={workshop} onToast={(m, kind) => toast.show(m, kind)} />
-                </>
-              ) : (
-                <View style={styles.cta} testID="visitor-cta">
-                  <Text style={styles.ctaTitle}>Want your own seat?</Text>
-                  <Text style={[styles.muted, { textAlign: "left" }]}>Free, 60 minutes, online. You'll get a project matched to your branch and interest.</Text>
-                  <Button testID="visitor-register-button" title="Get my hall ticket" onPress={() => router.push({ pathname: "/", params: { ref: t.seat_code } })} />
+                <View style={styles.colSide}>
+                  {shareBlock}
+                  {boardLinkBlock}
                 </View>
-              )}
-
-              <Pressable testID="ticket-board-link" accessibilityRole="link" onPress={() => router.push("/board")} style={({ focused }: any) => [styles.boardLink, focused && styles.focused]}>
-                <Ionicons name="podium-outline" size={18} color={colors.onSurface} />
-                <Text style={styles.boardLinkText}>See how {t.college} is doing on the campus board →</Text>
-              </Pressable>
-            </>
-          )}
+              </View>
+            ) : (
+              <>
+                {headerBlock}
+                {ticketBlock}
+                {shareBlock}
+                {boardLinkBlock}
+              </>
+            ))}
 
           <Footer text={workshop?.footer} />
-        </View>
+        </PageContainer>
       </ScrollView>
     </View>
   );
@@ -124,7 +151,9 @@ const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  container: { width: "100%", maxWidth: 560, alignSelf: "center", gap: spacing.xl },
+  cols: { flexDirection: "row", alignItems: "flex-start", gap: spacing["2xl"], width: "100%" },
+  colMain: { flex: 1, minWidth: 0, gap: spacing.xl },
+  colSide: { flex: 1, minWidth: 0, gap: spacing.xl },
   center: { alignItems: "center", gap: spacing.md, paddingVertical: spacing["3xl"] },
   topRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   kicker: { fontFamily: fonts.bold, fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: colors.brandPrimary },

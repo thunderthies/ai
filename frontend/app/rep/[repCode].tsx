@@ -12,6 +12,7 @@ import { TrendLine } from "@/src/components/Charts";
 import { Footer } from "@/src/components/Footer";
 import { Header } from "@/src/components/Header";
 import { useToast } from "@/src/components/Toast";
+import { PageContainer, useBreakpoint } from "@/src/responsive";
 import { buildRepMessage, openWhatsApp, TONES, Tone } from "@/src/share";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
@@ -19,6 +20,7 @@ export default function RepScreen() {
   const styles = useStyles();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { isWide } = useBreakpoint();
   const router = useRouter();
   const toast = useToast();
   const { repCode } = useLocalSearchParams<{ repCode: string }>();
@@ -38,11 +40,109 @@ export default function RepScreen() {
 
   const message = rep ? buildRepMessage(tone, { date: config?.workshop.datetime_label ?? "", link: rep.link, college: rep.college }) : "";
 
+  const heroBlock = rep ? (
+    <View style={styles.hero}>
+      <View style={styles.heroTop}>
+        <Text style={styles.kicker}>Campus rep dashboard</Text>
+        {rep.is_demo && (
+          <View style={styles.demoTag} testID="rep-demo-label">
+            <Text style={styles.demoTagText}>Demo data</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.h1} testID="rep-name">
+        {rep.name}
+      </Text>
+      <Text style={styles.sub}>
+        {rep.college} · code <Text style={styles.mono}>{rep.rep_code}</Text>
+      </Text>
+    </View>
+  ) : null;
+
+  const kpisBlock = rep ? (
+    <>
+      <View style={styles.kpis}>
+        <View style={[styles.kpi, styles.kpiPrimary]} testID="rep-total">
+          <Text style={[styles.kpiLabel, styles.kpiLabelOnPrimary]}>Total seats</Text>
+          <Text style={[styles.kpiValue, styles.kpiValueOnPrimary]}>{rep.total}</Text>
+        </View>
+        <View style={styles.kpi} testID="rep-rank">
+          <Text style={styles.kpiLabel}>Rank</Text>
+          <Text style={styles.kpiValue}>
+            #{rep.rank}
+            <Text style={styles.kpiSmall}>/{rep.rep_count}</Text>
+          </Text>
+        </View>
+      </View>
+      <View style={styles.kpis}>
+        <View style={styles.kpi} testID="rep-direct">
+          <Text style={styles.kpiLabel}>Direct from my link</Text>
+          <Text style={styles.kpiValue}>{rep.direct}</Text>
+        </View>
+        <View style={styles.kpi} testID="rep-chain">
+          <Text style={styles.kpiLabel}>Via referral chain</Text>
+          <Text style={styles.kpiValue}>{rep.via_chain}</Text>
+        </View>
+      </View>
+    </>
+  ) : null;
+
+  const trendBlock = rep ? (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Last 14 days</Text>
+      <TrendLine points={rep.trend} testID="rep-trend" />
+    </View>
+  ) : null;
+
+  const linkBlock = rep ? (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>My link</Text>
+      <Text style={styles.link} selectable testID="rep-link">
+        {rep.link}
+      </Text>
+      <Button testID="rep-copy-link" title="Copy my link" variant="ink" onPress={copy} icon={<Ionicons name="link-outline" size={18} color={colors.onSurfaceInverse} />} />
+    </View>
+  ) : null;
+
+  const messagesBlock = rep ? (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Ready-made WhatsApp messages</Text>
+      <View style={styles.toneRow} accessibilityRole="radiogroup">
+        {TONES.map((tn) => {
+          const selected = tn.key === tone;
+          return (
+            <Pressable key={tn.key} testID={`rep-tone-${tn.key}`} accessibilityRole="radio" accessibilityState={{ selected, checked: selected }} onPress={() => setTone(tn.key)} style={({ focused }: any) => [styles.tone, selected && styles.toneSelected, focused && styles.focused]}>
+              <Text style={[styles.toneText, selected && styles.toneTextSelected]}>{tn.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={styles.preview} testID="rep-message-preview">
+        <Text style={styles.previewText}>{message}</Text>
+      </View>
+      <Button testID="rep-whatsapp-button" title="Send on WhatsApp" onPress={() => openWhatsApp(message)} icon={<Ionicons name="logo-whatsapp" size={20} color={colors.onBrandPrimary} />} />
+    </View>
+  ) : null;
+
+  const recentBlock = rep && rep.recent.length > 0 ? (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Recent seats from my network</Text>
+      {rep.recent.map((r) => (
+        <View key={r.seat_code} style={styles.recentRow}>
+          <Text style={styles.recentName}>
+            {r.name} <Text style={styles.recentMeta}>· {r.seat_code}</Text>
+          </Text>
+          <Text style={styles.recentMeta}>{new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</Text>
+        </View>
+      ))}
+    </View>
+  ) : null;
+
   return (
     <View style={styles.screen} testID="rep-screen">
       <Header />
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
-        <View style={styles.container}>
+        <PageContainer maxWidth={560} style={styles.containerGap}>
           {repQ.isLoading && (
             <View style={styles.center} testID="rep-loading">
               <ActivityIndicator color={colors.onSurface} />
@@ -55,97 +155,34 @@ export default function RepScreen() {
             </View>
           )}
 
-          {rep && (
-            <>
-              <View style={styles.hero}>
-                <View style={styles.heroTop}>
-                  <Text style={styles.kicker}>Campus rep dashboard</Text>
-                  {rep.is_demo && (
-                    <View style={styles.demoTag} testID="rep-demo-label">
-                      <Text style={styles.demoTagText}>Demo data</Text>
-                    </View>
-                  )}
+          {rep &&
+            (isWide ? (
+              <>
+                {heroBlock}
+                <View style={styles.cols}>
+                  <View style={styles.colMain}>
+                    {kpisBlock}
+                    {trendBlock}
+                    {recentBlock}
+                  </View>
+                  <View style={styles.colSide}>
+                    {linkBlock}
+                    {messagesBlock}
+                  </View>
                 </View>
-                <Text style={styles.h1} testID="rep-name">
-                  {rep.name}
-                </Text>
-                <Text style={styles.sub}>
-                  {rep.college} · code <Text style={styles.mono}>{rep.rep_code}</Text>
-                </Text>
-              </View>
-
-              <View style={styles.kpis}>
-                <View style={[styles.kpi, styles.kpiPrimary]} testID="rep-total">
-                  <Text style={[styles.kpiLabel, styles.kpiLabelOnPrimary]}>Total seats</Text>
-                  <Text style={[styles.kpiValue, styles.kpiValueOnPrimary]}>{rep.total}</Text>
-                </View>
-                <View style={styles.kpi} testID="rep-rank">
-                  <Text style={styles.kpiLabel}>Rank</Text>
-                  <Text style={styles.kpiValue}>
-                    #{rep.rank}
-                    <Text style={styles.kpiSmall}>/{rep.rep_count}</Text>
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.kpis}>
-                <View style={styles.kpi} testID="rep-direct">
-                  <Text style={styles.kpiLabel}>Direct from my link</Text>
-                  <Text style={styles.kpiValue}>{rep.direct}</Text>
-                </View>
-                <View style={styles.kpi} testID="rep-chain">
-                  <Text style={styles.kpiLabel}>Via referral chain</Text>
-                  <Text style={styles.kpiValue}>{rep.via_chain}</Text>
-                </View>
-              </View>
-
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Last 14 days</Text>
-                <TrendLine points={rep.trend} testID="rep-trend" />
-              </View>
-
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>My link</Text>
-                <Text style={styles.link} selectable testID="rep-link">
-                  {rep.link}
-                </Text>
-                <Button testID="rep-copy-link" title="Copy my link" variant="ink" onPress={copy} icon={<Ionicons name="link-outline" size={18} color={colors.onSurfaceInverse} />} />
-              </View>
-
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Ready-made WhatsApp messages</Text>
-                <View style={styles.toneRow} accessibilityRole="radiogroup">
-                  {TONES.map((t) => {
-                    const selected = t.key === tone;
-                    return (
-                      <Pressable key={t.key} testID={`rep-tone-${t.key}`} accessibilityRole="radio" accessibilityState={{ selected, checked: selected }} onPress={() => setTone(t.key)} style={({ focused }: any) => [styles.tone, selected && styles.toneSelected, focused && styles.focused]}>
-                        <Text style={[styles.toneText, selected && styles.toneTextSelected]}>{t.label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <View style={styles.preview} testID="rep-message-preview">
-                  <Text style={styles.previewText}>{message}</Text>
-                </View>
-                <Button testID="rep-whatsapp-button" title="Send on WhatsApp" onPress={() => openWhatsApp(message)} icon={<Ionicons name="logo-whatsapp" size={20} color={colors.onBrandPrimary} />} />
-              </View>
-
-              {rep.recent.length > 0 && (
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Recent seats from my network</Text>
-                  {rep.recent.map((r) => (
-                    <View key={r.seat_code} style={styles.recentRow}>
-                      <Text style={styles.recentName}>
-                        {r.name} <Text style={styles.recentMeta}>· {r.seat_code}</Text>
-                      </Text>
-                      <Text style={styles.recentMeta}>{new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </>
-          )}
+              </>
+            ) : (
+              <>
+                {heroBlock}
+                {kpisBlock}
+                {trendBlock}
+                {linkBlock}
+                {messagesBlock}
+                {recentBlock}
+              </>
+            ))}
           <Footer text={config?.workshop.footer} />
-        </View>
+        </PageContainer>
       </ScrollView>
     </View>
   );
@@ -155,7 +192,10 @@ const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  container: { width: "100%", maxWidth: 560, alignSelf: "center", gap: spacing.lg },
+  containerGap: { gap: spacing.lg },
+  cols: { flexDirection: "row", alignItems: "flex-start", gap: spacing["2xl"], width: "100%" },
+  colMain: { flex: 1, minWidth: 0, gap: spacing.lg },
+  colSide: { flex: 1, minWidth: 0, gap: spacing.lg },
   center: { alignItems: "center", gap: spacing.md, paddingVertical: spacing["3xl"] },
   hero: { gap: spacing.xs },
   heroTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

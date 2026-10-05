@@ -2,7 +2,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +17,7 @@ import { HallTicket } from "@/src/components/HallTicket";
 import { Header } from "@/src/components/Header";
 import { useToast } from "@/src/components/Toast";
 import { Attribution, getAttribution, MY_SEAT_KEY } from "@/src/referral";
+import { useBreakpoint } from "@/src/responsive";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 import { track } from "@/src/track";
 import { storage } from "@/src/utils/storage";
@@ -30,7 +31,7 @@ export default function Home() {
   const router = useRouter();
   const toast = useToast();
   const qc = useQueryClient();
-  const { width } = useWindowDimensions();
+  const { width } = useBreakpoint();
   const twoCol = width >= 900;
   const reduce = useReducedMotion();
 
